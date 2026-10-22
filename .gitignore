@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.streamlit/secrets.toml
+pdf_scraper/data/*.db
+pdf_scraper/data/*.sqlite3
+pdf_scraper/data/downloads/
+pdf_scraper/data/logs/
+dist/
+build/
+*.spec
+.pytest_cache/
