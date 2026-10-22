@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import json
-import os
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TypeVar
 
 from playwright.sync_api import Page, sync_playwright
@@ -183,91 +180,8 @@ class WebsiteScanner:
         try:
             with sync_playwright() as playwright:
                 try:
-                    # #region agent log
-                    _dbg_path = Path(__file__).resolve().parents[2] / "debug-ce1b42.log"
-                    _browsers = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
-                    _expected = (
-                        Path(_browsers)
-                        / "chromium_headless_shell-1243"
-                        / "chrome-headless-shell-win64"
-                        / "chrome-headless-shell.exe"
-                        if _browsers
-                        else None
-                    )
-                    with _dbg_path.open("a", encoding="utf-8") as _dbg:
-                        _dbg.write(
-                            json.dumps(
-                                {
-                                    "sessionId": "ce1b42",
-                                    "runId": "post-fix",
-                                    "hypothesisId": "A,B,C,D",
-                                    "location": "website_scanner.py:collect:before_launch",
-                                    "message": "About to launch Chromium",
-                                    "data": {
-                                        "headless": headless,
-                                        "playwrightBrowsersPath": _browsers or None,
-                                        "expectedExeExists": (
-                                            _expected.is_file() if _expected else None
-                                        ),
-                                        "expectedExe": str(_expected) if _expected else None,
-                                        "pythonExecutable": __import__("sys").executable,
-                                        "cwd": os.getcwd(),
-                                    },
-                                    "timestamp": int(time.time() * 1000),
-                                }
-                            )
-                            + "\n"
-                        )
-                    # #endregion
-                    browser, launch_channel = _launch_chromium(
-                        playwright, headless=headless
-                    )
-                    # #region agent log
-                    with _dbg_path.open("a", encoding="utf-8") as _dbg:
-                        _dbg.write(
-                            json.dumps(
-                                {
-                                    "sessionId": "ce1b42",
-                                    "runId": "post-fix",
-                                    "hypothesisId": "A,E,F",
-                                    "location": "website_scanner.py:collect:after_launch",
-                                    "message": "Chromium launch succeeded",
-                                    "data": {
-                                        "browserVersion": getattr(browser, "version", None),
-                                        "launchChannel": launch_channel,
-                                    },
-                                    "timestamp": int(time.time() * 1000),
-                                }
-                            )
-                            + "\n"
-                        )
-                    # #endregion
+                    browser = _launch_chromium(playwright, headless=headless)
                 except Exception as exc:
-                    # #region agent log
-                    _dbg_path = Path(__file__).resolve().parents[2] / "debug-ce1b42.log"
-                    with _dbg_path.open("a", encoding="utf-8") as _dbg:
-                        _dbg.write(
-                            json.dumps(
-                                {
-                                    "sessionId": "ce1b42",
-                                    "runId": "post-fix",
-                                    "hypothesisId": "A,B,C,E,F",
-                                    "location": "website_scanner.py:collect:launch_failed",
-                                    "message": "Chromium launch failed",
-                                    "data": {
-                                        "errorType": type(exc).__name__,
-                                        "errorText": str(exc)[:800],
-                                        "playwrightBrowsersPath": os.environ.get(
-                                            "PLAYWRIGHT_BROWSERS_PATH"
-                                        ),
-                                        "mappedMessage": _browser_start_message(exc),
-                                    },
-                                    "timestamp": int(time.time() * 1000),
-                                }
-                            )
-                            + "\n"
-                        )
-                    # #endregion
                     self._logger.exception("Browser startup failed")
                     raise ScanError(_browser_start_message(exc)) from exc
                 try:
@@ -1048,8 +962,7 @@ def _run_on_worker_thread(func: Callable[[], _T]) -> _T:
 def _launch_chromium(playwright, *, headless: bool):
     """Launch bundled Chromium, or fall back to system Chrome/Edge when missing."""
     try:
-        browser = playwright.chromium.launch(headless=headless)
-        return browser, "bundled"
+        return playwright.chromium.launch(headless=headless)
     except Exception as first:
         text = str(first).lower()
         missing = (
@@ -1062,10 +975,9 @@ def _launch_chromium(playwright, *, headless: bool):
         last = first
         for channel in ("chrome", "msedge"):
             try:
-                browser = playwright.chromium.launch(
+                return playwright.chromium.launch(
                     channel=channel, headless=headless
                 )
-                return browser, channel
             except Exception as channel_exc:  # noqa: PERF203 — try each channel
                 last = channel_exc
         raise last from first
